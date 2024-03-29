@@ -1,25 +1,34 @@
-package com.workintech.spring17challenge.controller;
+package com.workintech.spring17challenge;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workintech.spring17challenge.entity.Course;
 import com.workintech.spring17challenge.entity.Grade;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.env.Environment;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-class CourseControllerTest {
+ class ApplicationPropertiesAndControllerTest {
+
+    @Autowired
+    private Environment env;
+
 
     @Autowired
     private MockMvc mockMvc;
@@ -28,7 +37,6 @@ class CourseControllerTest {
     private ObjectMapper objectMapper;
 
     private Course course;
-
     @BeforeEach
     void setUp() throws Exception {
         // Setup a sample Course object
@@ -42,6 +50,43 @@ class CourseControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(course)))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    @DisplayName("application properties istenilenler eklendi mi?")
+    void serverPortIsSetTo8585() {
+
+        String serverPort = env.getProperty("server.port");
+        assertThat(serverPort).isEqualTo("9000");
+
+        String contextPath = env.getProperty("server.servlet.context-path");
+        assertNotNull(contextPath);
+        assertThat(contextPath).isEqualTo("/workintech");
+
+    }
+
+    @Test
+    void testHandleApiException() throws Exception {
+
+        String nonExistingName = "testCourseName";
+
+        mockMvc.perform(get("/courses/{name}", nonExistingName))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.status").value(HttpStatus.NOT_FOUND.value()));
+    }
+
+    @Test
+    void testCreateCourseValidationFailure() throws Exception {
+        Course invalidCourse = new Course(null, null, null, null); // Assuming this will fail validation
+
+        mockMvc.perform(post("/courses")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidCourse)))
+                .andExpect(status().isBadRequest()) // Expecting validation failure
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.status").value(HttpStatus.BAD_REQUEST.value()));
     }
 
     @Test
@@ -89,3 +134,5 @@ class CourseControllerTest {
                 .andExpect(status().isOk());
     }
 }
+
+
